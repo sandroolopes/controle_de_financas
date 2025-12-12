@@ -100,16 +100,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       {/* Header */}
-      <header className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">Visão Geral</h1>
-          <p className="text-sm text-gray-500 capitalize">
-            {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
-          </p>
-        </div>
-        <div className="bg-navy-900 text-white p-2 rounded-full">
-           <Icons.Dashboard size={20} />
-        </div>
+      <header className="mb-6">
+          <div className="flex items-center gap-3">
+             <div className="w-12 h-12 bg-navy-900 rounded-xl flex items-center justify-center shadow-lg shadow-navy-900/20">
+               <Icons.Logo className="text-emerald-400" size={24} strokeWidth={2.5} />
+             </div>
+             <div>
+               <h1 className="text-2xl font-bold text-navy-900 leading-tight">Visão Geral</h1>
+               <p className="text-sm text-gray-500 capitalize">
+                 {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+               </p>
+             </div>
+          </div>
       </header>
 
       {/* Alerts Section */}

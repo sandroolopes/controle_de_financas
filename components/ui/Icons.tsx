@@ -14,7 +14,8 @@ import {
   Camera,
   X,
   Filter,
-  Search
+  Search,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Icons = {
@@ -33,5 +34,6 @@ export const Icons = {
   Camera,
   Close: X,
   Filter,
-  Search
+  Search,
+  Logo: ShieldCheck
 };
