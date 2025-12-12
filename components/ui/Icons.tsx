@@ -15,7 +15,7 @@ import {
   X,
   Filter,
   Search,
-  ShieldCheck
+  Wallet
 } from 'lucide-react';
 
 export const Icons = {
@@ -35,5 +35,5 @@ export const Icons = {
   Close: X,
   Filter,
   Search,
-  Logo: ShieldCheck
+  Logo: Wallet
 };

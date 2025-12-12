@@ -21,6 +21,6 @@ export interface SummaryStats {
 }
 
 export const CATEGORIES = {
-  income: ['Salário', 'Investimentos', 'Freelance', 'Outros'],
-  expense: ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Outros']
+  income: ['Salário', 'Investimentos', 'Aluguel','Freelance', 'Outros'],
+  expense: ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Cartão', 'Outros']
 };

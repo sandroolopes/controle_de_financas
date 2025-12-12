@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction } from '../types';
+import { Transaction, TransactionType } from '../types';
 import { Icons } from './ui/Icons';
 import { generateId } from '../services/storage';
 
@@ -15,28 +15,102 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredTransactions = transactions
+  // Base filtering (Month + Search)
+  const baseTransactions = transactions
     .filter(t => t.date.startsWith(filterMonth))
     .filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()) || t.category.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Group by date
-  const groupedTransactions: Record<string, Transaction[]> = {};
-  filteredTransactions.forEach(t => {
-    if (!groupedTransactions[t.date]) groupedTransactions[t.date] = [];
-    groupedTransactions[t.date].push(t);
-  });
+  // Split into sections
+  const incomeTransactions = baseTransactions.filter(t => t.type === 'income');
+  const expenseTransactions = baseTransactions.filter(t => t.type === 'expense');
+
+  // Calculate section totals for display headers
+  const totalIncome = incomeTransactions.reduce((acc, t) => acc + t.amount, 0);
+  const totalExpense = expenseTransactions.reduce((acc, t) => acc + t.amount, 0);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
 
-  // Logic to find fixed transactions from the previous month that are missing in the current month
+  const formatDateShort = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00');
+    const day = date.getDate().toString().padStart(2, '0');
+    // 'short' usually returns "dez." or "de dez". We want "05 dez"
+    const month = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').replace('de ', '');
+    return `${day} ${month}`;
+  };
+
+  // Helper to render flat list of cards
+  const renderList = (list: Transaction[], emptyMessage: string) => {
+    if (list.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+           <p className="text-sm">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    return list.map(t => (
+      <div 
+        key={t.id} 
+        className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-3 last:mb-0 flex items-center group hover:border-gray-200 transition-all"
+        onClick={() => onEdit(t)} // Make whole card clickable for mobile ease
+      >
+        {/* Checkbox / Status */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onToggleStatus(t); }}
+          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors mr-3 ${
+            t.isPaid ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-300'
+          }`}
+        >
+           <Icons.Check size={18} />
+        </button>
+
+        {/* Content Container */}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Title (Left) - Date (Right) */}
+          <div className="flex justify-between items-start mb-1">
+            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+               <p className="font-bold text-navy-900 truncate text-sm">{t.title}</p>
+               {t.isFixed && <Icons.Calendar size={10} className="text-blue-500 flex-shrink-0" />}
+            </div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0 pt-0.5">
+              {formatDateShort(t.date)}
+            </p>
+          </div>
+
+          {/* Row 2: Category (Left) - Value (Right) */}
+          <div className="flex justify-between items-end">
+            <p className="text-xs text-gray-500 truncate pr-2">{t.category}</p>
+            
+            <div className="flex items-center gap-2">
+               {/* Actions (Visible on Desktop Hover / Mobile tap opens edit) */}
+               <div className="hidden group-hover:flex items-center gap-2 mr-1">
+                 <button 
+                  onClick={(e) => { e.stopPropagation(); onDelete(t.id); }}
+                  className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                  title="Excluir"
+                 >
+                   <Icons.Delete size={14} />
+                 </button>
+               </div>
+
+               <span className={`font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                 {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
+               </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    ));
+  };
+
+  // Logic to find fixed transactions from the previous month
   const pendingFixedTransactions = useMemo(() => {
     if (!onBatchAdd) return [];
     
     const [year, month] = filterMonth.split('-').map(Number);
-    // Previous Month Logic
     let prevYear = year;
     let prevMonth = month - 1;
     if (prevMonth === 0) {
@@ -45,16 +119,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     }
     const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-    // 1. Get fixed transactions from previous month
     const prevMonthFixed = transactions.filter(t => 
       t.date.startsWith(prevMonthStr) && t.isFixed
     );
 
-    // 2. Check if they already exist in current filterMonth (based on title and amount)
     const currentMonthTx = transactions.filter(t => t.date.startsWith(filterMonth));
     
     const missing = prevMonthFixed.filter(prev => {
-      // Check if a similar transaction exists in current month
       const exists = currentMonthTx.some(curr => 
         curr.title === prev.title && 
         curr.amount === prev.amount &&
@@ -73,15 +144,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       const [year, month] = filterMonth.split('-').map(Number);
       
       const newTransactions = pendingFixedTransactions.map(t => {
-        // Keep day, update month/year
         const day = t.date.split('-')[2];
         const newDate = `${year}-${String(month).padStart(2, '0')}-${day}`;
-        
         return {
           ...t,
           id: generateId(),
           date: newDate,
-          isPaid: false // Reset status to unpaid/unreceived
+          isPaid: false 
         };
       });
 
@@ -90,7 +159,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   return (
-    <div className="space-y-4 pb-24 animate-fade-in">
+    <div className="space-y-6 pb-24 animate-fade-in">
       <header className="flex flex-col gap-4 mb-2">
         <h1 className="text-2xl font-bold text-navy-900">Lançamentos</h1>
         
@@ -136,57 +205,46 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         </button>
       )}
 
-      <div className="space-y-6">
-        {Object.keys(groupedTransactions).length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-             <Icons.List size={48} className="mb-2 opacity-20" />
-             <p>Nenhum lançamento encontrado.</p>
+      {/* SECTION 1: INCOMES */}
+      <section>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <div className="text-emerald-600">
+            <Icons.Income size={20} />
+        </div>
+            <h2 className="text-lg font-bold text-navy-900">Receitas</h2>
           </div>
-        ) : (
-          Object.entries(groupedTransactions).map(([date, items]) => (
-            <div key={date}>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">
-                {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </h3>
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-                {items.map(t => (
-                  <div key={t.id} className="p-4 flex items-center justify-between group hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4 overflow-hidden">
-                      <button 
-                        onClick={() => onToggleStatus(t)}
-                        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${t.isPaid ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-300'}`}
-                      >
-                         <Icons.Check size={18} />
-                      </button>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                           <p className="font-bold text-navy-900 truncate">{t.title}</p>
-                           {t.isFixed && <Icons.Calendar size={12} className="text-blue-500" />}
-                        </div>
-                        <p className="text-xs text-gray-500 truncate">{t.category}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right flex flex-col items-end">
-                      <span className={`font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
-                      </span>
-                      <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button onClick={() => onEdit(t)} className="text-gray-400 hover:text-navy-900">
-                           <Icons.Edit size={16} />
-                         </button>
-                         <button onClick={() => onDelete(t.id)} className="text-gray-400 hover:text-red-600">
-                           <Icons.Delete size={16} />
-                         </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+            {formatCurrency(totalIncome)}
+          </span>
+        </div>
+        
+        <div className="space-y-1">
+          {renderList(incomeTransactions, "Nenhuma receita encontrada")}
+        </div>
+      </section>
+
+      <hr className="border-gray-200 my-6" />
+
+      {/* SECTION 2: EXPENSES */}
+      <section>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <div className="text-rose-600">
+              <Icons.Expense size={20} />
             </div>
-          ))
-        )}
-      </div>
+            <h2 className="text-lg font-bold text-navy-900">Despesas</h2>
+          </div>
+          <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full">
+            {formatCurrency(totalExpense)}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          {renderList(expenseTransactions, "Nenhuma despesa encontrada")}
+        </div>
+      </section>
+
     </div>
   );
 };

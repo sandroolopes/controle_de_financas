@@ -106,9 +106,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                <Icons.Logo className="text-emerald-400" size={24} strokeWidth={2.5} />
              </div>
              <div>
-               <h1 className="text-2xl font-bold text-navy-900 leading-tight">Visão Geral</h1>
+               <h1 className="text-2xl font-bold text-navy-900 leading-tight">GestorX</h1>
                <p className="text-sm text-gray-500 capitalize">
-                 {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+                 {new Date().toLocaleString('pt-BR', { month: 'long' })} {new Date().getFullYear()}
                </p>
              </div>
           </div>
@@ -138,7 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32">
           <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-navy-900"></span>
-            Saldo Real
+            Saldo Atual
           </div>
           <div>
             <span className={`text-xl font-bold ${stats.balance >= 0 ? 'text-navy-900' : 'text-red-600'}`}>
