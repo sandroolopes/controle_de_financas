@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Transaction, SummaryStats } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Legend, YAxis } from 'recharts';
 import { Icons } from './ui/Icons';
@@ -12,8 +12,23 @@ const GREEN = '#10b981';
 const RED = '#f43f5e';
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<'none' | 'annual' | 'about'>('none');
+  const menuRef = useRef<HTMLDivElement>(null);
+  
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Filter for current month
   const monthlyTransactions = useMemo(() => {
@@ -45,6 +60,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       expensePaid
     };
   }, [monthlyTransactions]);
+
+  // Annual Report Data Logic
+  const annualReportData = useMemo(() => {
+    const data = Array.from({ length: 12 }, (_, i) => ({
+      monthName: new Date(0, i).toLocaleString('pt-BR', { month: 'long' }),
+      income: 0,
+      expense: 0
+    }));
+
+    let totalYearIncome = 0;
+    let totalYearExpense = 0;
+
+    transactions.forEach(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      // Filter only for current year and only PAID/RECEIVED transactions
+      if (d.getFullYear() === currentYear && t.isPaid) {
+        const month = d.getMonth();
+        if (t.type === 'income') {
+          data[month].income += t.amount;
+          totalYearIncome += t.amount;
+        } else {
+          data[month].expense += t.amount;
+          totalYearExpense += t.amount;
+        }
+      }
+    });
+
+    return { monthly: data, totalYearIncome, totalYearExpense };
+  }, [transactions, currentYear]);
 
   // Alerts logic
   const alerts = useMemo(() => {
@@ -97,10 +141,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
 
+  const closeModal = () => {
+    setActiveModal('none');
+    setIsMenuOpen(false);
+  };
+
   return (
-    <div className="space-y-6 pb-24 animate-fade-in">
+    <div className="space-y-6 pb-24 animate-fade-in relative">
       {/* Header */}
-      <header className="mb-6">
+      <header className="mb-6 flex justify-between items-start">
           <div className="flex items-center gap-3">
              <div className="w-12 h-12 bg-navy-900 rounded-xl flex items-center justify-center shadow-lg shadow-navy-900/20">
                <Icons.Logo className="text-emerald-400" size={24} strokeWidth={2.5} />
@@ -111,6 +160,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                  {new Date().toLocaleString('pt-BR', { month: 'long' })} {new Date().getFullYear()}
                </p>
              </div>
+          </div>
+          
+          {/* Menu Button */}
+          <div className="relative" ref={menuRef}>
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 -mr-2 text-gray-400 hover:text-navy-900 transition-colors rounded-full hover:bg-gray-100"
+            >
+              <Icons.Menu size={24} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isMenuOpen && (
+              <div className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                <button 
+                  onClick={() => setActiveModal('annual')}
+                  className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  <Icons.Report size={18} className="text-navy-900" />
+                  Relatório anual
+                </button>
+                <div className="h-px bg-gray-100 mx-2"></div>
+                <button 
+                   onClick={() => setActiveModal('about')}
+                   className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  <Icons.Info size={18} className="text-navy-900" />
+                  Sobre
+                </button>
+              </div>
+            )}
           </div>
       </header>
 
@@ -242,6 +322,94 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           )}
         </div>
       </div>
+
+      {/* MODALS */}
+      {activeModal !== 'none' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+           
+           {/* Modal Container */}
+           <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h2 className="text-lg font-bold text-navy-900">
+                  {activeModal === 'annual' ? `Relatório Anual ${currentYear}` : 'Sobre'}
+                </h2>
+                <button onClick={closeModal} className="p-1 rounded-full hover:bg-gray-200 text-gray-500">
+                  <Icons.Close size={20} />
+                </button>
+              </div>
+
+              {/* Modal Content - Scrollable */}
+              <div className="p-5 overflow-y-auto">
+                
+                {/* ABOUT CONTENT */}
+                {activeModal === 'about' && (
+                  <div className="text-center py-4">
+                    <div className="w-16 h-16 bg-navy-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-navy-900/20">
+                      <Icons.Logo className="text-emerald-400" size={32} strokeWidth={2.5} />
+                    </div>
+                    <h3 className="text-xl font-bold text-navy-900 mb-1">GestorX</h3>
+                    <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-6">Versão 1.0.0</p>
+                    
+                    <p className="text-gray-600 leading-relaxed text-sm">
+                      O GestorX é um aplicativo de gestão financeira desenvolvido com o apoio do Google AI Studio e do ChatGPT, com o objetivo de ajudar no controle de receitas, despesas e organização financeira.
+                    </p>
+
+                    <div className="mt-8 pt-6 border-t border-gray-100">
+                      <p className="text-xs text-gray-400">© {currentYear} GestorX</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ANNUAL REPORT CONTENT */}
+                {activeModal === 'annual' && (
+                  <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
+                        <p className="text-xs font-semibold text-emerald-600 mb-1 uppercase">Total Receitas</p>
+                        <p className="text-base font-bold text-emerald-800">{formatCurrency(annualReportData.totalYearIncome)}</p>
+                      </div>
+                      <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 text-center">
+                        <p className="text-xs font-semibold text-rose-600 mb-1 uppercase">Total Despesas</p>
+                        <p className="text-base font-bold text-rose-800">{formatCurrency(annualReportData.totalYearExpense)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Month List */}
+                    <div>
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Detalhamento Mensal</h3>
+                      <div className="space-y-3">
+                        {annualReportData.monthly.map((m, idx) => (
+                          (m.income > 0 || m.expense > 0) ? (
+                            <div key={idx} className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center">
+                               <span className="font-bold text-navy-900 capitalize w-20 text-sm">{m.monthName}</span>
+                               <div className="text-right flex flex-col items-end gap-1">
+                                  <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                    <Icons.Income size={12} />
+                                    {formatCurrency(m.income)}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-rose-600 font-medium">
+                                    <Icons.Expense size={12} />
+                                    {formatCurrency(m.expense)}
+                                  </div>
+                               </div>
+                            </div>
+                          ) : null
+                        ))}
+                         {annualReportData.totalYearIncome === 0 && annualReportData.totalYearExpense === 0 && (
+                           <p className="text-center text-gray-400 text-sm py-4">Nenhum registro efetivado neste ano.</p>
+                         )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+           </div>
+        </div>
+      )}
 
     </div>
   );

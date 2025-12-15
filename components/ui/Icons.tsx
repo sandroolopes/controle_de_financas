@@ -15,7 +15,10 @@ import {
   X,
   Filter,
   Search,
-  Wallet
+  Wallet,
+  MoreVertical,
+  FileText,
+  Info
 } from 'lucide-react';
 
 export const Icons = {
@@ -35,5 +38,8 @@ export const Icons = {
   Close: X,
   Filter,
   Search,
-  Logo: Wallet
+  Logo: Wallet,
+  Menu: MoreVertical,
+  Report: FileText,
+  Info
 };
